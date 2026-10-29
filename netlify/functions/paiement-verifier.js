@@ -12,6 +12,7 @@ exports.handler = async (event) => {
     const r = await verifierChezCinetPay(id);
     return json(200, { no: id, statut: r.statut });
   } catch (e) {
-    return json(502, { erreur: 'Impossible de vérifier le paiement pour le moment.' });
+    console.log('Vérification impossible', id, e.message);
+    return json(502, { erreur: 'Impossible de vérifier le paiement pour le moment.', diagnostic: e.diagnostic || 'erreur_inconnue' });
   }
 };

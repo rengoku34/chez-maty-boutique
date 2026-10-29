@@ -57,6 +57,6 @@ exports.handler = async (event) => {
     return json(200, { no: id, total: cmd.total, payment_url: r.data.payment_url });
   } catch (e) {
     console.log('CinetPay injoignable ou refus de connexion', e.message);
-    return json(502, { erreur: 'Le service de paiement ne répond pas. Réessayez dans un instant.' });
+    return json(502, { erreur: 'Le service de paiement ne répond pas. Réessayez dans un instant.', diagnostic: e.diagnostic || 'erreur_inconnue' });
   }
 };

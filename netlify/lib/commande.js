@@ -74,11 +74,11 @@ const ID_RE = /^CM\d{6}[A-F0-9]{6}$/;
 // ---------- API CinetPay v1 (panel.cinetpay.net) ----------
 // Clé sk_test_... = Sandbox (api.cinetpay.net), clé sk_live_... = production (api.cinetpay.co).
 function cinetpayBase() {
-  return String(process.env.CINETPAY_API_KEY || '').startsWith('sk_live_') ? 'https://api.cinetpay.co' : 'https://api.cinetpay.net';
+  return String(process.env.CINETPAY_API_KEY || '').trim().startsWith('sk_live_') ? 'https://api.cinetpay.co' : 'https://api.cinetpay.net';
 }
 function cinetpayConfigure() {
   const k = process.env.CINETPAY_API_KEY || '';
-  return /^sk_(test|live)_/.test(k) && !!process.env.CINETPAY_API_PASSWORD;
+  return /^sk_(test|live)_/.test(k.trim()) && !!String(process.env.CINETPAY_API_PASSWORD || '').trim();
 }
 
 let jeton = null;            // jeton gardé en mémoire tant que la fonction reste chaude
@@ -98,8 +98,20 @@ async function appelCinetPay(method, path, body, token) {
 
 async function jetonCinetPay(forcer) {
   if (!forcer && jeton && Date.now() < jetonExpire) return jeton;
-  const r = await appelCinetPay('POST', '/v1/oauth/login', { api_key: process.env.CINETPAY_API_KEY, api_password: process.env.CINETPAY_API_PASSWORD });
-  if (!r.data.access_token) throw new Error('Connexion à CinetPay refusée (clé ou mot de passe API).');
+  let r;
+  try {
+    r = await appelCinetPay('POST', '/v1/oauth/login', { api_key: process.env.CINETPAY_API_KEY.trim(), api_password: process.env.CINETPAY_API_PASSWORD.trim() });
+  } catch (e) {
+    const err = new Error('CinetPay injoignable : ' + (e.name === 'AbortError' ? 'délai dépassé' : e.message));
+    err.diagnostic = 'cinetpay_injoignable';
+    throw err;
+  }
+  if (!r.data.access_token) {
+    // Jamais de clé dans les messages : seulement le code renvoyé par CinetPay
+    const err = new Error('Connexion refusée par CinetPay (HTTP ' + r.http + ', ' + (r.data.status || r.data.code || 'sans détail') + ')');
+    err.diagnostic = 'connexion_refusee:' + String(r.data.status || r.data.code || r.http).slice(0, 40);
+    throw err;
+  }
   jeton = r.data.access_token;
   jetonExpire = Date.now() + Math.min(Number(r.data.expires_in) || 86400, 82800) * 1000;
   return jeton;
