@@ -21,8 +21,19 @@ var BOUTIQUE = {
   // Si les clés ne sont pas encore sur Netlify, le site repasse tout seul au paiement manuel ci-dessous.
   // actif: false = toujours le paiement manuel (Wave / Orange Money + référence).
   cinetpay: {
+    actif: false
+  },
+
+  // ---- PAIEMENT À LA LIVRAISON ----
+  // Proposé seulement si la commande ne contient AUCUN article personnalisé (prénom) :
+  // un article au prénom ne peut pas être revendu, il doit être payé avant.
+  paiementLivraison: {
     actif: true
   },
+
+  // ---- ESPACE MATY (page maty.html) ----
+  // Adresse(s) Gmail qui peuvent ouvrir l'espace Maty. À recopier aussi dans firestore.rules.
+  admins: ["aboubakarnabaloum741@gmail.com"],
 
   // ---- PAIEMENT MANUEL : l'argent va directement sur ces comptes ----
   wave: {

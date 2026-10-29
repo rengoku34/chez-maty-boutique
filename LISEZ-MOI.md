@@ -82,3 +82,25 @@ Le glisser-déposer de Netlify publie seulement les pages, **pas les fonctions d
 2. Dans le terminal de VS Code, dans le dossier `boutique-bebe` : `npx netlify-cli login`, puis `npx netlify-cli deploy --prod`.
 
 Après la mise en ligne, ajouter l'adresse du site dans Firebase > Authentication > Settings > **Authorized domains**.
+
+
+## Espace Maty et paiements protégés (sans CinetPay)
+**Pour la cliente**
+- Connexion Google obligatoire avant de commander.
+- Paiement Wave ou Orange Money avec la **référence** du SMS. Une référence ne peut servir **qu'une seule fois** (la base refuse une référence déjà utilisée, même tapée avec des espaces ou des points différents).
+- **Paiement à la livraison** proposé seulement si aucun article n'est personnalisé au prénom (`config.js` > `paiementLivraison`).
+- Suivi dans **Compte > Mes commandes** : Paiement en vérification, Paiement confirmé, En préparation, Chez le livreur, Livrée.
+
+**Pour Maty : la page `maty.html`** (ex. https://chez-maty-boutique.netlify.app/maty.html)
+- Se connecter avec **son compte Google**. Les commandes arrivent en direct.
+- « À vérifier » : ouvrir son application Wave / Orange Money, vérifier le montant, la référence et le numéro, puis cliquer **Paiement reçu ✓** (ou **Pas reçu : annuler**).
+- Ensuite : **En préparation**, **Remise au livreur**, **Livrée ✓**. Le bouton **Prévenir la cliente** prépare le message WhatsApp.
+- Une alerte rouge s'affiche si le total d'une commande ne correspond pas aux vrais prix (prix trafiqué).
+
+**Activer l'espace Maty**
+1. Mettre l'adresse Gmail de Maty dans `config.js` (`admins`) **et** dans `firestore.rules` (fonction `estMaty`).
+2. Firebase > Firestore Database > **Règles** : coller tout le contenu de `firestore.rules`, puis **Publier**.
+3. Firebase > Authentication > Settings > **Authorized domains** : ajouter `chez-maty-boutique.netlify.app`.
+4. Envoyer les fichiers sur GitHub (`git add .`, `git commit -m "..."`, `git push`) : Netlify republie tout seul.
+
+**La règle d'or reste la même : ne jamais livrer avant d'avoir vu l'argent dans sa propre application.**

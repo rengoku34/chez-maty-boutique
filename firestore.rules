@@ -1,23 +1,76 @@
 rules_version = '2';
-// Chaque cliente ne peut lire et modifier QUE ses propres données.
+// Règles de sécurité Chez Maty.
+// - Chaque cliente ne voit QUE ses propres données et commandes.
+// - Seule Maty (adresse(s) Gmail ci-dessous) voit toutes les commandes et change leur statut.
+// - Une référence de paiement ne peut servir qu'UNE seule fois.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function connecte() {
+      return request.auth != null;
+    }
+    // ⚠️ Remplacer par l'adresse Gmail de Maty (la même que dans config.js > admins)
+    function estMaty() {
+      return connecte() && request.auth.token.email_verified == true
+        && request.auth.token.email in ['aboubakarnabaloum741@gmail.com'];
+    }
+
+    // Profil de la cliente
     match /users/{uid} {
-      allow read, delete: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
+      allow read, delete: if connecte() && request.auth.uid == uid;
+      allow create, update: if connecte() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['nom', 'tel', 'adresse', 'creeLe'])
         && request.resource.data.get('nom', '').size() <= 60
         && request.resource.data.get('tel', '').size() <= 20
         && request.resource.data.get('adresse', '').size() <= 120;
 
+      // Ancien historique (avant l'espace Maty) : lecture et suppression seulement
       match /commandes/{no} {
-        allow read, delete: if request.auth != null && request.auth.uid == uid;
-        allow create: if request.auth != null && request.auth.uid == uid
-          && request.resource.data.no == no
-          && request.resource.data.keys().hasOnly(['no', 'date', 'total', 'paiement', 'articles', 'adresse']);
-        allow update: if false;
+        allow read, delete: if connecte() && request.auth.uid == uid;
+        allow create, update: if false;
       }
     }
-    match /{document=**} { allow read, write: if false; }
+
+    // Références de paiement déjà utilisées (une seule fois chacune)
+    match /references/{ref} {
+      allow create: if connecte()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['no', 'uid', 'creeLe'])
+        && ref.size() >= 4 && ref.size() <= 60;
+      allow read: if estMaty();
+      allow update, delete: if false;
+    }
+
+    // Commandes
+    match /commandes/{no} {
+      allow read: if estMaty() || (connecte() && resource.data.uid == request.auth.uid);
+
+      // La cliente crée sa commande, seulement à son nom et avec un statut de départ
+      allow create: if connecte()
+        && no.size() <= 30
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.no == no
+        && request.resource.data.keys().hasOnly(['no', 'uid', 'email', 'nom', 'tel', 'adresse', 'note',
+             'articles', 'sousTotal', 'livraison', 'total', 'paiement', 'statut', 'creeLe', 'majLe'])
+        && request.resource.data.total is int && request.resource.data.total > 0 && request.resource.data.total <= 5000000
+        && request.resource.data.articles is list && request.resource.data.articles.size() >= 1 && request.resource.data.articles.size() <= 30
+        && request.resource.data.statut in ['en_attente_paiement', 'a_payer_livraison']
+        && (
+          request.resource.data.statut == 'a_payer_livraison'
+          // paiement déjà fait : la référence doit être enregistrée en même temps, pour cette commande
+          || getAfter(/databases/$(database)/documents/references/$(request.resource.data.paiement.refId)).data.no == no
+        );
+
+      // Seule Maty fait avancer la commande
+      allow update: if estMaty()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['statut', 'majLe', 'noteMaty'])
+        && request.resource.data.statut in ['en_attente_paiement', 'a_payer_livraison', 'payee', 'preparation', 'livraison', 'livree', 'annulee'];
+
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }

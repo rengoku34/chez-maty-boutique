@@ -57,8 +57,10 @@ async function loadAccount() {
       profile = { nom: clean(user.displayName, 60), tel: '', adresse: '' };
       await fsM.setDoc(ref, Object.assign({}, profile, { creeLe: fsM.serverTimestamp() }));
     }
-    const q = fsM.query(fsM.collection(db, 'users', user.uid, 'commandes'), fsM.orderBy('date', 'desc'), fsM.limit(20));
-    orders = (await fsM.getDocs(q)).docs.map((d) => d.data());
+    // Commandes de la cliente (triées ici pour éviter un index Firestore)
+    const q = fsM.query(fsM.collection(db, 'commandes'), fsM.where('uid', '==', user.uid), fsM.limit(50));
+    orders = (await fsM.getDocs(q)).docs.map((d) => d.data())
+      .sort((a, b) => quand(b) - quand(a)).slice(0, 20);
   } catch (e) {
     message = 'Impossible de charger votre compte. Vérifiez votre connexion internet.';
   }
@@ -123,14 +125,47 @@ async function deleteAccount() {
   render();
 }
 
-// Enregistre la commande dans "Mes commandes" quand la cliente est connectée
-document.addEventListener('cm:order', async (e) => {
-  if (!user || !fb) return;
-  const o = e.detail;
+function quand(o) {
+  const t = o.creeLe;
+  return t && typeof t.toMillis === 'function' ? t.toMillis() : (Number(t) || 0);
+}
+
+// Libellés du suivi de commande
+const STATUTS = {
+  en_attente_paiement: 'Paiement en vérification',
+  a_payer_livraison: 'À payer à la livraison',
+  payee: 'Paiement confirmé ✓',
+  preparation: 'En préparation',
+  livraison: 'Chez le livreur',
+  livree: 'Livrée ✓',
+  annulee: 'Annulée'
+};
+
+// Enregistre la commande (et la référence de paiement, utilisable une seule fois) en une seule opération.
+// detail = { commande, done(erreur) } ; erreur = null | 'reference_deja_utilisee' | 'non_connectee' | 'reseau'
+document.addEventListener('cm:save-order', async (e) => {
+  const { commande, done } = e.detail;
+  if (!fb || !user) { done('non_connectee'); return; }
+  const { fsM, db } = fb;
   try {
-    await fb.fsM.setDoc(fb.fsM.doc(fb.db, 'users', user.uid, 'commandes', o.no), o);
-    orders.unshift(o);
-  } catch (err) { /* la commande part quand même sur WhatsApp */ }
+    const c = Object.assign({}, commande, {
+      uid: user.uid,
+      email: clean(user.email, 80),
+      creeLe: fsM.serverTimestamp(),
+      majLe: fsM.serverTimestamp()
+    });
+    const batch = fsM.writeBatch(db);
+    if (c.statut === 'en_attente_paiement') {
+      batch.set(fsM.doc(db, 'references', c.paiement.refId), { no: c.no, uid: user.uid, creeLe: fsM.serverTimestamp() });
+    }
+    batch.set(fsM.doc(db, 'commandes', c.no), c);
+    await batch.commit();
+    orders.unshift(Object.assign({}, c, { creeLe: Date.now() }));
+    done(null);
+  } catch (err) {
+    // Une référence déjà enregistrée rend l'écriture interdite par les règles
+    done(err && err.code === 'permission-denied' ? 'reference_deja_utilisee' : 'reseau');
+  }
 });
 
 function updateHeader() {
@@ -164,7 +199,7 @@ function render() {
   }
   if (view === 'delete') {
     body.innerHTML = '<div class="co"><h3 id="acc-title">Supprimer mon compte ?</h3>' +
-      '<p>Vos informations et l\'historique de vos commandes seront effacés définitivement. Vos commandes en cours restent valables auprès de Chez Maty.</p>' +
+      '<p>Vos informations personnelles seront effacées définitivement. Les commandes déjà passées restent enregistrées chez Chez Maty pour la livraison et la comptabilité.</p>' +
       '<div class="actions"><button class="btn danger block" type="button" data-acc="delete-yes">Oui, supprimer mon compte</button>' +
       '<button class="btn ghost block" type="button" data-acc="delete-no">Annuler</button></div></div>';
     return;
@@ -173,7 +208,10 @@ function render() {
     ? '<img class="acc-photo" src="' + esc(user.photoURL) + '" alt="" referrerpolicy="no-referrer">'
     : '<span class="acc-photo acc-initial" aria-hidden="true">' + esc((profile.nom || user.email || '?').charAt(0).toUpperCase()) + '</span>';
   const list = orders.length
-    ? orders.map((o) => '<li class="acc-order"><div><b>' + esc(o.no) + '</b><small>' + esc(new Date(o.date).toLocaleDateString('fr-FR')) + ' · ' + esc((o.articles || []).map((a) => a.qty + ' × ' + a.nom).join(', ')) + '</small></div><span class="mono">' + fmt(o.total || 0) + '</span></li>').join('')
+    ? orders.map((o) => '<li class="acc-order"><div><b>' + esc(o.no) + '</b>' +
+        '<span class="statut st-' + esc(o.statut) + '">' + esc(STATUTS[o.statut] || 'Commande reçue') + '</span>' +
+        '<small>' + esc(new Date(quand(o) || Date.now()).toLocaleDateString('fr-FR')) + ' · ' + esc((o.articles || []).map((a) => a.qty + ' × ' + a.nom).join(', ')) + '</small></div>' +
+        '<span class="mono">' + fmt(o.total || 0) + '</span></li>').join('')
     : '<li class="muted">Aucune commande pour le moment.</li>';
   body.innerHTML = '<div class="co">' +
     '<div class="acc-who">' + photo + '<div><h3 id="acc-title">' + esc(profile.nom || user.displayName || 'Mon compte') + '</h3><small class="muted">' + esc(user.email || '') + '</small></div></div>' +

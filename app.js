@@ -309,12 +309,19 @@
   function grandTotal() { return subtotal() + shipCost(); }
   // Paiement en ligne CinetPay (vérification automatique) ou paiement manuel par référence
   var CP = !!(C.cinetpay && C.cinetpay.actif);
+  // Paiement à la livraison : seulement si aucun article n'est personnalisé (un article au prénom se paie avant)
+  function livraisonPossible() {
+    return !!(C.paiementLivraison && C.paiementLivraison.actif) && state.cart.every(function (l) { return !l.prenom; });
+  }
   function methods() {
     var m = [];
     if (C.wave.actif) m.push('wave');
     if (C.orangeMoney.actif) m.push('om');
+    if (livraisonPossible()) m.push('livraison');
     return m;
   }
+  var PAY_NOMS = { wave: 'Wave', om: 'Orange Money', livraison: 'À la livraison' };
+  var PAY_COULEURS = { wave: 'var(--wave)', om: 'var(--orange)', livraison: 'var(--gold)' };
 
   function openCheckout() {
     // Connexion Google obligatoire avant de payer, dès que le module de connexion est actif (auth.js)
@@ -325,7 +332,7 @@
       return;
     }
     order.step = 1;
-    if (!order.pay) order.pay = methods()[0];
+    if (!order.pay || methods().indexOf(order.pay) === -1) order.pay = methods()[0];
     $('#cart-sheet').close();
     renderCheckout();
     $('#checkout').showModal();
@@ -386,6 +393,10 @@
           '<li>Recopiez la référence de la transaction reçue par SMS ou dans l\'historique Wave.</li></ol>' +
           copyRow('Numéro Wave', C.wave.numero) + copyRow('Montant', String(grandTotal())) +
           (C.wave.lien ? '<a class="btn wave block" href="' + esc(C.wave.lien) + '" target="_blank" rel="noopener">Ouvrir Wave</a>' : '') + '</div>';
+      } else if (order.pay === 'livraison') {
+        box = '<div class="pay-box"><b>Payer à la livraison</b>' +
+          '<p>Vous payez le livreur quand il vous remet le colis : par Wave, Orange Money ou en espèces.</p>' +
+          '<p>Préparez <b>' + amount + '</b>. Maty vous appelle ou vous écrit pour confirmer la livraison.</p></div>';
       } else {
         box = '<div class="pay-box"><b>Payer avec Orange Money</b><ol>' +
           '<li>Composez <b>' + esc(C.orangeMoney.codeMenu) + '</b> sur votre téléphone, ou ouvrez l\'application Orange Money.</li>' +
@@ -395,15 +406,17 @@
       }
       b.innerHTML = '<form class="co" id="pay-form" novalidate>' +
         '<h3 id="co-title">Paiement</h3>' + recapHtml() +
-        (m.length > 1 ? '<div class="pay-tabs">' +
-          '<button type="button" class="pay-tab" data-pay="wave" aria-pressed="' + (order.pay === 'wave') + '"><span class="dot" style="background:var(--wave)"></span>Wave</button>' +
-          '<button type="button" class="pay-tab" data-pay="om" aria-pressed="' + (order.pay === 'om') + '"><span class="dot" style="background:var(--orange)"></span>Orange Money</button></div>' : '') +
+        (m.length > 1 ? '<div class="pay-tabs n' + m.length + '">' + m.map(function (k) {
+          return '<button type="button" class="pay-tab" data-pay="' + k + '" aria-pressed="' + (order.pay === k) + '"><span class="dot" style="background:' + PAY_COULEURS[k] + '"></span>' + PAY_NOMS[k] + '</button>';
+        }).join('') + '</div>' : '') +
+        (!livraisonPossible() && C.paiementLivraison && C.paiementLivraison.actif ? '<p class="muted" style="font-size:.85rem">Les articles personnalisés au prénom se paient avant la préparation.</p>' : '') +
         box +
-        '<label class="field" for="co-ref"><span>Référence de la transaction</span><input class="input" id="co-ref" required maxlength="40" autocomplete="off" placeholder="Ex. : T240512.1532.A12345" value="' + esc(order.ref) + '"></label>' +
-        '<label class="field" for="co-paytel"><span>Numéro qui a payé</span><input class="input" id="co-paytel" type="tel" required maxlength="20" inputmode="tel" value="' + esc(order.payTel || order.tel) + '"></label>' +
-        '<p class="note">Personne ne vous demandera jamais votre code secret. Ne le donnez à personne, même par téléphone.</p>' +
+        (order.pay === 'livraison' ? '' :
+          '<label class="field" for="co-ref"><span>Référence de la transaction</span><input class="input" id="co-ref" required maxlength="40" autocomplete="off" placeholder="Ex. : T240512.1532.A12345" value="' + esc(order.ref) + '"></label>' +
+          '<label class="field" for="co-paytel"><span>Numéro qui a payé</span><input class="input" id="co-paytel" type="tel" required maxlength="20" inputmode="tel" value="' + esc(order.payTel || order.tel) + '"></label>' +
+          '<p class="note">Personne ne vous demandera jamais votre code secret. Ne le donnez à personne, même par téléphone. Chaque référence ne peut servir qu\'une seule fois.</p>') +
         '<p class="err-msg" id="co-err" hidden></p>' +
-        '<div class="actions"><button class="btn primary block" type="submit">J\'ai payé, valider ma commande</button>' +
+        '<div class="actions"><button class="btn primary block" type="submit" id="pay-go">' + (order.pay === 'livraison' ? 'Valider ma commande' : 'J\'ai payé, valider ma commande') + '</button>' +
         '<button class="btn ghost block" type="button" data-back>Retour</button></div>' +
       '</form>';
     } else {
@@ -411,7 +424,11 @@
         '<div class="done-mark" aria-hidden="true">✓</div>' +
         '<h3 id="co-title">Dernière étape : envoyez votre commande</h3>' +
         '<p class="muted">Numéro de commande</p><p class="order-no">' + esc(order.no) + '</p>' +
-        '<p>Touchez le bouton vert pour envoyer le détail à ' + esc(C.nom) + ' sur WhatsApp. Maty vérifie le paiement, puis un livreur vous apporte le colis sous 24 h.</p>' +
+        '<p>Touchez le bouton vert pour envoyer le détail à ' + esc(C.nom) + ' sur WhatsApp. ' +
+          (order.pay === 'livraison'
+            ? 'Préparez ' + fmt(grandTotal()) + ' pour le livreur, qui vous apporte le colis sous 24 h.'
+            : 'Maty vérifie le paiement, puis un livreur vous apporte le colis sous 24 h.') +
+          ' Suivez l\'avancement dans « Compte », puis « Mes commandes ».</p>' +
         '<div class="actions" style="width:100%"><a class="btn wa block" id="send-wa" href="' + waLink() + '" target="_blank" rel="noopener">Envoyer sur WhatsApp</a>' +
         '<p class="muted" style="font-size:.88rem">WhatsApp ne s\'ouvre pas ? Écrivez au <b class="mono">+' + esc(C.whatsapp) + '</b> en donnant le numéro de commande.</p>' +
         '<button class="btn ghost block" type="button" data-finish>Retour à la boutique</button></div>' +
@@ -493,9 +510,13 @@
       });
   }
 
-  // Enregistre la commande dans « Mes commandes » (auth.js), dès que le compte est chargé
-  function emitOrder(detail) {
-    var send = function () { document.dispatchEvent(new CustomEvent('cm:order', { detail: detail })); };
+  // Paiement CinetPay confirmé : la commande est enregistrée avec la transaction comme référence unique
+  function emitOrder() {
+    order.pay = 'cinetpay'; order.ref = order.no; order.payTel = order.tel;
+    var commande = commandeAEnregistrer();   // copie faite maintenant : le panier est vidé juste après
+    var send = function () {
+      document.dispatchEvent(new CustomEvent('cm:save-order', { detail: { commande: commande, done: function () {} } }));
+    };
     if (document.body.classList.contains('cm-logged')) send();
     else document.addEventListener('cm:profile', function once() { document.removeEventListener('cm:profile', once); setTimeout(send, 0); });
   }
@@ -508,11 +529,7 @@
         order.cp = { statut: d.statut || 'erreur', montant: d.montant, moyen: d.moyen, erreur: d.erreur };
         if (d.statut === 'paye') {
           store.set('cm_pending', null);
-          emitOrder({
-            no: order.no, date: Date.now(), total: d.montant || grandTotal(), adresse: order.adresse,
-            paiement: 'CinetPay ' + (d.moyen || ''),
-            articles: state.cart.map(function (l) { return { nom: byId[l.id].nom, qty: l.qty, details: lineDetails(l) }; })
-          });
+          emitOrder();
         }
         renderCheckout();
         // payé : le panier est vidé tout de suite (le message WhatsApp est déjà préparé)
@@ -548,7 +565,7 @@
   }
 
   function orderText() {
-    var lines = [(order.cp && order.cp.statut === 'paye' ? '✅ *Commande PAYÉE ' : '🛍️ *Nouvelle commande ') + order.no + '*', ''];
+    var lines = [(order.cp && order.cp.statut === 'paye' ? '✅ *Commande PAYÉE ' : order.pay === 'livraison' ? '🛍️ *Nouvelle commande (paiement à la livraison) ' : '🛍️ *Nouvelle commande ') + order.no + '*', ''];
     state.cart.forEach(function (l) {
       var p = byId[l.id];
       lines.push('• ' + l.qty + ' × ' + p.nom + ' — ' + fmt(unitPrice(l) * l.qty));
@@ -561,8 +578,13 @@
       lines.push('*Total payé : ' + fmt(order.cp.montant || grandTotal()) + '*');
       lines.push('Paiement en ligne CinetPay vérifié' + (order.cp.moyen ? ' (' + moyenNom(order.cp.moyen) + ')' : '') + ', transaction ' + order.no + '. Visible dans votre espace CinetPay.');
     } else {
-      lines.push('*Total payé : ' + fmt(grandTotal()) + '*');
-      lines.push('Paiement : ' + (order.pay === 'wave' ? 'Wave' : 'Orange Money') + ', réf. ' + order.ref + ', depuis le ' + order.payTel);
+      if (order.pay === 'livraison') {
+        lines.push('*Total à encaisser à la livraison : ' + fmt(grandTotal()) + '*');
+      } else {
+        lines.push('*Total payé : ' + fmt(grandTotal()) + '*');
+        lines.push('Paiement : ' + PAY_NOMS[order.pay] + ', réf. ' + order.ref + ', depuis le ' + order.payTel);
+        lines.push('⚠️ À vérifier dans votre application ' + PAY_NOMS[order.pay] + ' avant de livrer.');
+      }
     }
     lines.push('', 'Client : ' + order.nom, 'Tél : ' + order.tel);
     if (order.email) lines.push('Compte Google : ' + order.email);
@@ -590,20 +612,59 @@
     store.set('pn_client', { nom: order.nom, tel: order.tel, adresse: order.adresse });
     order.step = 2; renderCheckout(); $('#checkout').scrollTop = 0;
   }
+  // Référence normalisée : sert d'identifiant unique dans la base (une seule utilisation)
+  // (seuls les lettres et chiffres comptent : « CI24.1532 A1 » et « ci24 1532-a1 » sont la même référence)
+  function refId(ref) { return String(ref).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 60); }
+
+  function commandeAEnregistrer() {
+    var manuel = order.pay !== 'livraison';
+    return {
+      no: order.no, nom: order.nom, tel: order.tel, adresse: order.adresse, note: order.note || '',
+      articles: state.cart.map(function (l) {
+        return { id: l.id, nom: byId[l.id].nom, qty: l.qty, taille: l.taille || '', prenom: l.prenom || '', fil: l.fil || '', unit: unitPrice(l) };
+      }),
+      sousTotal: subtotal(), livraison: shipCost(), total: grandTotal(),
+      paiement: manuel
+        ? { mode: order.pay, ref: order.ref, refId: refId(order.ref), payTel: order.payTel }
+        : { mode: 'livraison' },
+      statut: manuel ? 'en_attente_paiement' : 'a_payer_livraison'
+    };
+  }
+
+  // Enregistre la commande via auth.js (Firebase). Sans module de connexion actif, on continue sans base.
+  function enregistrerCommande(cb) {
+    if (!document.body.classList.contains('cm-auth')) { cb(null); return; }
+    var fini = false;
+    var t = setTimeout(function () { if (!fini) { fini = true; cb('reseau'); } }, 15000);
+    document.dispatchEvent(new CustomEvent('cm:save-order', { detail: {
+      commande: commandeAEnregistrer(),
+      done: function (err) { if (fini) return; fini = true; clearTimeout(t); cb(err); }
+    } }));
+  }
+
   function submitStep2() {
-    order.ref = clean($('#co-ref').value, 40);
-    order.payTel = clean($('#co-paytel').value, 20);
-    if (order.ref.length < 4) return showErr('Recopiez la référence de la transaction reçue par SMS.', $('#co-ref'));
-    if (!validPhone(order.payTel)) return showErr('Indiquez le numéro qui a fait le paiement.', $('#co-paytel'));
+    if (order.pay !== 'livraison') {
+      order.ref = clean($('#co-ref').value, 40);
+      order.payTel = clean($('#co-paytel').value, 20);
+      if (refId(order.ref).length < 4) return showErr('Recopiez la référence de la transaction reçue par SMS.', $('#co-ref'));
+      if (!validPhone(order.payTel)) return showErr('Indiquez le numéro qui a fait le paiement.', $('#co-paytel'));
+    } else if (!livraisonPossible()) {
+      order.pay = methods()[0]; renderCheckout(); return;
+    }
     var d = new Date();
     order.no = 'CM-' + String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '-' +
       Math.random().toString(36).slice(2, 6).toUpperCase();
-    document.dispatchEvent(new CustomEvent('cm:order', { detail: {
-      no: order.no, date: Date.now(), total: grandTotal(), adresse: order.adresse,
-      paiement: (order.pay === 'wave' ? 'Wave' : 'Orange Money') + ' ' + order.ref,
-      articles: state.cart.map(function (l) { return { nom: byId[l.id].nom, qty: l.qty, details: lineDetails(l) }; })
-    } }));
-    order.step = 3; renderCheckout(); $('#checkout').scrollTop = 0;
+    var btn = $('#pay-go'); var label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Enregistrement de la commande…';
+    enregistrerCommande(function (err) {
+      if (err) {
+        btn.disabled = false; btn.textContent = label;
+        if (err === 'reference_deja_utilisee') return showErr('Cette référence a déjà été utilisée pour une commande. Vérifiez-la dans votre SMS de paiement.', $('#co-ref'));
+        if (err === 'non_connectee') return showErr('Votre session a expiré. Fermez cette fenêtre et reconnectez-vous avec Google.');
+        return showErr('La commande n\'a pas pu être enregistrée. Vérifiez votre connexion internet et réessayez.');
+      }
+      order.step = 3; renderCheckout(); $('#checkout').scrollTop = 0;
+    });
   }
   function finishOrder() {
     state.cart = []; order.ref = ''; order.note = ''; order.step = 1; order.cp = null;
