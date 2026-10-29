@@ -1,0 +1,23 @@
+rules_version = '2';
+// Chaque cliente ne peut lire et modifier QUE ses propres données.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nom', 'tel', 'adresse', 'creeLe'])
+        && request.resource.data.get('nom', '').size() <= 60
+        && request.resource.data.get('tel', '').size() <= 20
+        && request.resource.data.get('adresse', '').size() <= 120;
+
+      match /commandes/{no} {
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.no == no
+          && request.resource.data.keys().hasOnly(['no', 'date', 'total', 'paiement', 'articles', 'adresse']);
+        allow update: if false;
+      }
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com; frame-src https://*.firebaseapp.com https://accounts.google.com https://apis.google.com; base-uri 'self'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="description" content="Vêtements et cadeaux de bébé personnalisés. Paiement Wave et Orange Money.">
+<title>Chez Maty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Great+Vibes&family=Mulish:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- BODY-START -->
+<div class="strip"><p class="wrap">Livraison en 24 h partout en Côte d'Ivoire <span aria-hidden="true">·</span> Paiement Wave et Orange Money</p></div>
+<header class="top">
+  <div class="top-in">
+    <nav class="top-nav" aria-label="Menu">
+      <a href="#boutique">Boutique</a>
+      <a href="#atelier">Personnalisation</a>
+      <a href="#commander">Commander</a>
+    </nav>
+    <a class="logo" href="#accueil"><img class="logo-img" src="images/logo-chez-maty.png" alt="Chez Maty, accueil" width="184" height="200"></a>
+    <div class="top-actions">
+      <button class="act" id="btn-search" type="button" aria-label="Rechercher">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg>
+      </button>
+      <button class="act" id="btn-account" type="button" aria-label="Mon compte">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6"/></svg>
+        <span class="act-label" id="acc-label">Compte</span>
+      </button>
+      <button class="act" id="btn-favs" type="button" aria-label="Mes favoris">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19.5s-7-4.3-7-9.6A3.9 3.9 0 0 1 12 7.6a3.9 3.9 0 0 1 7 2.3c0 5.3-7 9.6-7 9.6Z"/></svg>
+        <span class="count" id="fav-count" hidden>0</span>
+      </button>
+      <button class="act" id="btn-cart" type="button" aria-label="Mon panier">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 8.5h13l-1 11h-11z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/></svg>
+        <span class="count" id="cart-count" hidden>0</span>
+      </button>
+    </div>
+  </div>
+  <div class="search-row" id="search-row" hidden>
+    <label class="search wrap" for="q">
+      <span class="sr">Rechercher un article</span>
+      <input id="q" type="search" placeholder="Un coffret, une tétine, un prénom brodé…" autocomplete="off">
+    </label>
+  </div>
+</header>
+
+<main id="accueil">
+  <section class="hero" id="banners"></section>
+
+  <section class="wrap shop" id="boutique">
+    <div class="shop-head">
+      <div>
+        <p class="script">la boutique</p>
+        <h2 id="shop-title">Toute la boutique</h2>
+      </div>
+      <label class="sort" for="sort"><span class="sr">Trier</span>
+        <select id="sort">
+          <option value="pop">Nos coups de cœur</option>
+          <option value="asc">Prix croissant</option>
+          <option value="desc">Prix décroissant</option>
+        </select>
+      </label>
+    </div>
+    <div class="cats" id="catbar" role="tablist" aria-label="Rayons"></div>
+    <p class="count-line muted" id="result-count"></p>
+    <div class="grid" id="grid"></div>
+    <p class="empty" id="empty" hidden>Aucun article ne correspond. Essayez un autre mot.</p>
+  </section>
+
+  <section class="wrap rail-sec" id="rail-sec" hidden><div class="rail" id="rail"></div></section>
+
+  <section class="atelier" id="atelier">
+    <div class="wrap atelier-in">
+      <figure class="atelier-photo"><img src="images/coffret-brode-prenom.jpg" alt="Doudou et coussin brodés au prénom Jared, attache-tétine assortie" loading="lazy"></figure>
+      <div class="atelier-text">
+        <p class="script">fait pour lui, pour elle</p>
+        <h2>Le prénom de bébé, sur chaque cadeau</h2>
+        <p>Doudou, coussin, bavoir, attache-tétine en perles, caisse en bois : vous choisissez le prénom et la couleur, Maty prépare le cadeau à la commande.</p>
+        <p>Le prénom s'affiche pendant que vous l'écrivez, pour voir le rendu avant de commander.</p>
+        <button class="btn outline" type="button" data-cat-jump="brode">Voir les articles personnalisables</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap how" id="commander">
+    <h2>Comment commander</h2>
+    <ol class="steps">
+      <li><span class="step-n">1</span><div><b>Vous choisissez</b><p>Ajoutez vos articles au panier, avec le prénom et la taille.</p></div></li>
+      <li><span class="step-n">2</span><div><b>Vous payez par Wave ou Orange Money</b><p>Depuis votre téléphone, directement sur le compte de Maty. Aucun code secret n'est demandé sur le site.</p></div></li>
+      <li><span class="step-n">3</span><div><b>Vous confirmez sur WhatsApp</b><p>Maty vérifie le paiement, puis un livreur vous apporte le colis sous 24 h.</p></div></li>
+    </ol>
+  </section>
+
+  <section class="wrap sec" id="avis" hidden>
+    <h2>L'avis des clientes</h2>
+    <div class="review-list" id="review-list"></div>
+  </section>
+
+  <section class="insta">
+    <div class="wrap insta-in">
+      <div class="insta-head">
+        <p class="script">suivez-nous</p>
+        <a class="insta-handle" id="insta-link" href="https://www.instagram.com/chez_maty/" target="_blank" rel="noopener">@chez_maty</a>
+      </div>
+      <div class="insta-grid" id="insta-grid"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <img class="logo-foot" src="images/logo-complet.png" alt="Chez Maty, des petits bonheurs pour grands moments" width="393" height="520">
+    <div>
+      <p class="foot-title">Nous écrire</p>
+      <p>WhatsApp : <span class="mono" id="foot-wa"></span></p>
+      <p id="foot-ig" hidden>Instagram : <a class="foot-link" href="#" target="_blank" rel="noopener"></a></p>
+      <p id="foot-fb" hidden>Facebook : <span></span></p>
+    </div>
+    <div>
+      <p class="foot-title">Livraison et paiement</p>
+      <p>Par livreur, partout en Côte d'Ivoire, colis reçu en 24 h.</p>
+      <p>Paiement Wave ou Orange Money. Aucun code secret ni carte bancaire n'est demandé sur ce site.</p>
+    </div>
+  </div>
+  <p class="wrap copy">© <span id="year"></span> <span data-shop-name>Chez Maty</span></p>
+</footer>
+
+<a class="wa-float" id="wa-float" href="#" target="_blank" rel="noopener" aria-label="Écrire à Chez Maty sur WhatsApp">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 0 1-2-2l.8-1-1-2z"/></svg>
+</a>
+
+<dialog class="modal" id="product-modal" aria-labelledby="pm-title">
+  <form method="dialog" class="modal-close-row"><button class="x" aria-label="Fermer">×</button></form>
+  <div id="pm-body"></div>
+</dialog>
+
+<dialog class="sheet" id="cart-sheet" aria-labelledby="cs-title">
+  <div class="sheet-head">
+    <h2 id="cs-title">Mon panier</h2>
+    <form method="dialog"><button class="x" aria-label="Fermer">×</button></form>
+  </div>
+  <div class="sheet-body" id="cs-body"></div>
+  <div class="sheet-foot" id="cs-foot"></div>
+</dialog>
+
+<dialog class="modal checkout" id="account" aria-labelledby="acc-title">
+  <form method="dialog" class="modal-close-row"><button class="x" aria-label="Fermer">×</button></form>
+  <div id="acc-body"></div>
+</dialog>
+
+<dialog class="modal checkout" id="checkout" aria-labelledby="co-title">
+  <form method="dialog" class="modal-close-row"><button class="x" aria-label="Fermer">×</button></form>
+  <ol class="progress" id="co-progress">
+    <li>Coordonnées</li><li>Paiement</li><li>Confirmation</li>
+  </ol>
+  <div id="co-body"></div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<!-- BODY-END -->
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script src="firebase-config.js"></script>
+<script type="module" src="auth.js"></script>
+</body>
+</html>

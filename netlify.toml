@@ -1,0 +1,7 @@
+# Hébergement Netlify : le site est servi tel quel, les fonctions de paiement sont dans netlify/functions
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
